@@ -111,3 +111,12 @@ Add to your `claude_desktop_config.json` or Cursor MCP settings:
 docker build -t senviok-remote-mcp .
 docker run -p 3001:3001 -e PORT=3001 senviok-remote-mcp
 ```
+
+---
+
+## Partner and Startup Integration
+
+Third-party AI platforms, SaaS products, and enterprise applications can enable 1-click "Connect with Senviok" integration via standard OAuth 2.0 (RFC 6749) and PKCE (RFC 7636).
+
+For complete technical specifications, authorization endpoints, token exchange sequences, and client code samples in TypeScript and Python, see the [Partner Integration Guide](./INTEGRATION_GUIDE.md).
+
