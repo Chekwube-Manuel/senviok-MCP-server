@@ -37,7 +37,7 @@ app.get("/health", (req: Request, res: Response) => {
   res.json({
     status: "ok",
     service: "senviok-remote-mcp",
-    version: "1.0.0",
+    version: "1.1.0",
     uptimeSeconds: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
   });
@@ -47,7 +47,8 @@ app.get("/health", (req: Request, res: Response) => {
 app.get("/", (req: Request, res: Response) => {
   res.json({
     name: "Senviok Remote MCP Server",
-    description: "Cloud-hosted Model Context Protocol (MCP) server for Senviok email & SMS communications.",
+    description: "Cloud-hosted Model Context Protocol (MCP) server for Senviok email, SMS, WhatsApp, and delivery diagnostics.",
+    version: "1.1.0",
     endpoints: {
       sse: "/sse",
       messages: "/messages",
@@ -55,11 +56,33 @@ app.get("/", (req: Request, res: Response) => {
     },
     documentation: "https://docs.senviok.live",
     tools: [
+      // Email
       "senviok_send_email",
       "senviok_get_email_logs",
+      // SMS & WhatsApp
       "senviok_send_sms",
+      "senviok_send_whatsapp",
+      // Templates
+      "senviok_list_templates",
+      "senviok_get_template",
+      "senviok_create_template",
+      // Audiences & Contacts
+      "senviok_list_audiences",
+      "senviok_create_audience",
+      "senviok_add_contact",
+      // Suppressions & Deliverability
+      "senviok_list_suppressions",
+      "senviok_add_suppression",
+      "senviok_remove_suppression",
+      // Domains
       "senviok_list_domains",
+      "senviok_create_domain",
       "senviok_verify_domain",
+      "senviok_get_domain_dns_records",
+      // Webhooks
+      "senviok_list_webhooks",
+      "senviok_create_webhook",
+      // Billing & Account
       "senviok_get_account_balance",
     ],
   });
@@ -68,7 +91,6 @@ app.get("/", (req: Request, res: Response) => {
 /**
  * GET /sse
  * Main entry point for MCP clients connecting over Server-Sent Events (SSE).
- * Can supply API key via Authorization header, x-api-key, or ?api_key=...
  */
 app.get("/sse", async (req: Request, res: Response) => {
   const apiKey = extractApiKey(req);
@@ -124,7 +146,7 @@ app.post("/messages", async (req: Request, res: Response) => {
 
 app.listen(config.port, () => {
   console.log(`==================================================`);
-  console.log(`  🚀 Senviok Remote MCP Server is running!`);
+  console.log(`  🚀 Senviok Remote MCP Server v1.1.0 is running!`);
   console.log(`  📡 Listening on:   http://localhost:${config.port}`);
   console.log(`  🔗 SSE Endpoint:   http://localhost:${config.port}/sse`);
   console.log(`  🔗 Base API:       ${config.senviokBaseUrl}`);
