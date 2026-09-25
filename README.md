@@ -1,12 +1,12 @@
 # Senviok Remote MCP Server
 
-A cloud-hosted **Model Context Protocol (MCP)** server that exposes [Senviok's](https://senviok.live) communications infrastructure to AI agents and web platforms (such as Claude, ChatGPT, Cursor, and OkeyMeta).
+A cloud-hosted Model Context Protocol (MCP) server that exposes [Senviok's](https://senviok.live) communications infrastructure to AI agents and web platforms (such as Claude, ChatGPT, Cursor, and OkeyMeta).
 
 Built with TypeScript and the official `@modelcontextprotocol/sdk`.
 
 ---
 
-## 🌟 Key Features
+## Key Features
 
 - **Zero Client Installs**: Runs as a remote HTTP/Server-Sent Events (SSE) service. Web AI platforms (e.g. OkeyMeta, ChatGPT Custom Actions) connect directly over HTTPS without end-users needing Node or CLI tools.
 - **Instant Rollouts**: Add new tools to the server, and all connected AI agents immediately discover and use them on their next session without reinstalling or updating anything.
@@ -14,49 +14,49 @@ Built with TypeScript and the official `@modelcontextprotocol/sdk`.
 
 ---
 
-## 🛠️ Complete Tool Catalog (18 Tools)
+## Complete Tool Catalog (18 Tools)
 
-### 📧 Email
+### Email
 - `senviok_send_email`: Send transactional or marketing emails with HTML, text, and dynamic templates.
 - `senviok_get_email_logs`: Search delivery logs, check bounce reasons, and inspect open/click tracking.
 
-### 📱 SMS & WhatsApp
+### SMS and WhatsApp
 - `senviok_send_sms`: Send SMS text messages via approved Sender IDs.
 - `senviok_send_whatsapp`: Send WhatsApp messages directly or via pre-approved WhatsApp templates.
 
-### 🎨 Template Management
+### Template Management
 - `senviok_list_templates`: List all saved templates in your Senviok library.
 - `senviok_get_template`: Fetch template details and HTML content.
 - `senviok_create_template`: Create and save a new responsive HTML email template.
 
-### 👥 Audiences & Contacts (CRM)
+### Audiences and Contacts (CRM)
 - `senviok_list_audiences`: List contact audiences and subscriber lists.
 - `senviok_create_audience`: Create a new audience list for marketing campaigns.
 - `senviok_add_contact`: Add a subscriber contact with first/last name to an audience.
 
-### 🛡️ Deliverability & Suppressions
+### Deliverability and Suppressions
 - `senviok_list_suppressions`: View all suppressed, bounced, or unsubscribed emails.
 - `senviok_add_suppression`: Manually suppress an email address to protect sender reputation.
 - `senviok_remove_suppression`: Unblock an email from the suppression list.
 
-### 🌐 Domains & DNS
+### Domains and DNS
 - `senviok_list_domains`: View registered sending domains and SPF, DKIM, DMARC verification status.
 - `senviok_create_domain`: Register a new sending domain in Senviok.
 - `senviok_verify_domain`: Trigger live DNS check for SPF/DKIM propagation.
 - `senviok_get_domain_dns_records`: Get exact DNS records (TXT/CNAME) for domain configuration.
 
-### ⚡ Webhooks
+### Webhooks
 - `senviok_list_webhooks`: View registered webhooks and subscribed events.
 - `senviok_create_webhook`: Register a new webhook endpoint URL.
 
-### 💳 Billing & Account
+### Billing and Account
 - `senviok_get_account_balance`: Retrieve plan tier, remaining email/SMS credits, and usage stats.
 
 ---
 
-## 🚀 Quick Start (Local Development)
+## Quick Start (Local Development)
 
-### 1. Install & Build
+### 1. Install and Build
 ```bash
 npm install
 npm run build
@@ -81,7 +81,7 @@ The server will start at `http://localhost:3001`.
 
 ---
 
-## 🌐 Connecting from AI Platforms
+## Connecting from AI Platforms
 
 ### OkeyMeta / Remote AI Platforms
 Connect to the live SSE endpoint:
@@ -105,7 +105,7 @@ Add to your `claude_desktop_config.json` or Cursor MCP settings:
 
 ---
 
-## 🐳 Docker Deployment
+## Docker Deployment
 
 ```bash
 docker build -t senviok-remote-mcp .
