@@ -22,6 +22,35 @@ export interface SendSmsPayload {
   channel?: "dnd" | "whatsapp" | "generic";
 }
 
+export interface SendWhatsAppPayload {
+  to: string;
+  text: string;
+  templateId?: string;
+  data?: Record<string, any>;
+  deviceId?: string;
+}
+
+export interface CreateTemplatePayload {
+  name: string;
+  subject: string;
+  htmlContent: string;
+  mjmlContent?: string;
+  jsxSource?: string;
+}
+
+export interface CreateContactPayload {
+  audienceId: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  unsubscribed?: boolean;
+}
+
+export interface CreateWebhookPayload {
+  url: string;
+  events: string[];
+}
+
 export class SenviokApiClient {
   private baseUrl: string;
   private apiKey: string;
@@ -99,13 +128,104 @@ export class SenviokApiClient {
     });
   }
 
+  // --- WhatsApp Operations ---
+  async sendWhatsApp(payload: SendWhatsAppPayload): Promise<{ id: string }> {
+    return this.request<{ id: string }>("/whatsapp", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // --- Template Operations ---
+  async listTemplates(): Promise<any> {
+    return this.request("/templates", { method: "GET" });
+  }
+
+  async getTemplate(templateId: string): Promise<any> {
+    return this.request(`/templates/${templateId}`, { method: "GET" });
+  }
+
+  async createTemplate(payload: CreateTemplatePayload): Promise<any> {
+    return this.request("/templates", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // --- Audience & Contact Operations ---
+  async listAudiences(): Promise<any> {
+    return this.request("/audiences", { method: "GET" });
+  }
+
+  async createAudience(name: string): Promise<any> {
+    return this.request("/audiences", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  async addContact(payload: CreateContactPayload): Promise<any> {
+    return this.request(`/audiences/${payload.audienceId}/contacts`, {
+      method: "POST",
+      body: JSON.stringify({
+        email: payload.email,
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        unsubscribed: payload.unsubscribed ?? false,
+      }),
+    });
+  }
+
+  // --- Suppression Operations ---
+  async listSuppressions(): Promise<any> {
+    return this.request("/suppressions", { method: "GET" });
+  }
+
+  async addSuppression(email: string, reason?: string): Promise<any> {
+    return this.request("/suppressions", {
+      method: "POST",
+      body: JSON.stringify({ email, reason: reason || "Manual suppression" }),
+    });
+  }
+
+  async deleteSuppression(id: string): Promise<any> {
+    return this.request(`/suppressions/${id}`, { method: "DELETE" });
+  }
+
   // --- Domain Operations ---
   async listDomains(): Promise<any> {
     return this.request("/domains", { method: "GET" });
   }
 
+  async createDomain(name: string): Promise<any> {
+    return this.request("/domains", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    });
+  }
+
   async verifyDomain(domainId: string): Promise<any> {
     return this.request(`/domains/${domainId}/verify`, { method: "POST" });
+  }
+
+  async getDomainDkim(domainId: string): Promise<any> {
+    return this.request(`/domains/${domainId}/dkim`, { method: "GET" });
+  }
+
+  // --- Webhook Operations ---
+  async listWebhooks(): Promise<any> {
+    return this.request("/webhooks", { method: "GET" });
+  }
+
+  async createWebhook(payload: CreateWebhookPayload): Promise<any> {
+    return this.request("/webhooks", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteWebhook(webhookId: string): Promise<any> {
+    return this.request(`/webhooks/${webhookId}`, { method: "DELETE" });
   }
 
   // --- Account & Billing Operations ---
