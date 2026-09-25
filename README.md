@@ -1,6 +1,6 @@
 # Senviok Remote MCP Server
 
-A cloud-hosted **Model Context Protocol (MCP)** server that exposes [Senviok's](https://senviok.live) email, SMS, domain verification, and delivery diagnostics APIs to AI agents and web platforms (such as Claude, ChatGPT, Cursor, and OkeyMeta).
+A cloud-hosted **Model Context Protocol (MCP)** server that exposes [Senviok's](https://senviok.live) communications infrastructure to AI agents and web platforms (such as Claude, ChatGPT, Cursor, and OkeyMeta).
 
 Built with TypeScript and the official `@modelcontextprotocol/sdk`.
 
@@ -14,16 +14,43 @@ Built with TypeScript and the official `@modelcontextprotocol/sdk`.
 
 ---
 
-## 🛠️ Available Tools
+## 🛠️ Complete Tool Catalog (18 Tools)
 
-| Tool | Description |
-| :--- | :--- |
-| `senviok_send_email` | Send transactional or marketing emails with HTML, text, and dynamic templates. |
-| `senviok_get_email_logs` | Search delivery logs, check bounce reasons, and inspect open/click tracking. |
-| `senviok_send_sms` | Send SMS messages via approved Sender IDs. |
-| `senviok_list_domains` | View registered sending domains and SPF, DKIM, DMARC verification status. |
-| `senviok_verify_domain` | Trigger live DNS check for SPF/DKIM propagation. |
-| `senviok_get_account_balance` | Retrieve plan tier, remaining email/SMS credits, and usage stats. |
+### 📧 Email
+- `senviok_send_email`: Send transactional or marketing emails with HTML, text, and dynamic templates.
+- `senviok_get_email_logs`: Search delivery logs, check bounce reasons, and inspect open/click tracking.
+
+### 📱 SMS & WhatsApp
+- `senviok_send_sms`: Send SMS text messages via approved Sender IDs.
+- `senviok_send_whatsapp`: Send WhatsApp messages directly or via pre-approved WhatsApp templates.
+
+### 🎨 Template Management
+- `senviok_list_templates`: List all saved templates in your Senviok library.
+- `senviok_get_template`: Fetch template details and HTML content.
+- `senviok_create_template`: Create and save a new responsive HTML email template.
+
+### 👥 Audiences & Contacts (CRM)
+- `senviok_list_audiences`: List contact audiences and subscriber lists.
+- `senviok_create_audience`: Create a new audience list for marketing campaigns.
+- `senviok_add_contact`: Add a subscriber contact with first/last name to an audience.
+
+### 🛡️ Deliverability & Suppressions
+- `senviok_list_suppressions`: View all suppressed, bounced, or unsubscribed emails.
+- `senviok_add_suppression`: Manually suppress an email address to protect sender reputation.
+- `senviok_remove_suppression`: Unblock an email from the suppression list.
+
+### 🌐 Domains & DNS
+- `senviok_list_domains`: View registered sending domains and SPF, DKIM, DMARC verification status.
+- `senviok_create_domain`: Register a new sending domain in Senviok.
+- `senviok_verify_domain`: Trigger live DNS check for SPF/DKIM propagation.
+- `senviok_get_domain_dns_records`: Get exact DNS records (TXT/CNAME) for domain configuration.
+
+### ⚡ Webhooks
+- `senviok_list_webhooks`: View registered webhooks and subscribed events.
+- `senviok_create_webhook`: Register a new webhook endpoint URL.
+
+### 💳 Billing & Account
+- `senviok_get_account_balance`: Retrieve plan tier, remaining email/SMS credits, and usage stats.
 
 ---
 
