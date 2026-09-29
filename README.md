@@ -120,3 +120,5 @@ Third-party AI platforms, SaaS products, and enterprise applications can enable 
 
 For complete technical specifications, authorization endpoints, token exchange sequences, and client code samples in TypeScript and Python, see the [Partner Integration Guide](./INTEGRATION_GUIDE.md).
 
+[![M8ven Score](https://m8ven.ai/badge/mcp/chekwube-manuel/senviok-mcp-server)](https://m8ven.ai/mcp/chekwube-manuel/senviok-mcp-server)
+
