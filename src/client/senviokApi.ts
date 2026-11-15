@@ -18,8 +18,7 @@ export interface SendEmailPayload {
 export interface SendSmsPayload {
   to: string;
   message: string;
-  senderId?: string;
-  channel?: "dnd" | "whatsapp" | "generic";
+  senderId: string;
 }
 
 export interface SendWhatsAppPayload {
@@ -69,7 +68,8 @@ export class SenviokApiClient {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
     const headers: Record<string, string> = {
-      "Content-Type": "application/json",
+      Accept: "application/json",
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
       Authorization: `Bearer ${this.apiKey}`,
       ...(options.headers as Record<string, string> || {}),
     };
@@ -77,18 +77,22 @@ export class SenviokApiClient {
     const res = await fetch(url, {
       ...options,
       headers,
+      signal: options.signal ?? AbortSignal.timeout(30_000),
     });
 
     const contentType = res.headers.get("content-type") || "";
-    const isJson = contentType.includes("application/json");
-    const data = isJson ? await res.json() : await res.text();
+    const responseText = await res.text();
+    let data: unknown = responseText;
+    if (contentType.includes("application/json") && responseText) {
+      try { data = JSON.parse(responseText); } catch { /* retain raw response for useful diagnostics */ }
+    }
 
     if (!res.ok) {
       const errorMessage =
-        typeof data === "object" && data !== null && (data as any).message
-          ? (data as any).message
+        typeof data === "object" && data !== null && ((data as any).message || (data as any).Message || (data as any).error)
+          ? (data as any).message || (data as any).Message || (data as any).error
           : typeof data === "string"
-          ? data
+          ? data || `HTTP ${res.status} ${res.statusText}`
           : `HTTP ${res.status} ${res.statusText}`;
       throw new Error(errorMessage);
     }
@@ -109,12 +113,26 @@ export class SenviokApiClient {
     pageSize?: number;
     search?: string;
     status?: string;
+    channel?: string;
+    toAddress?: string;
+    subject?: string;
+    startDate?: string;
+    endDate?: string;
   } = {}): Promise<any> {
     const query = new URLSearchParams();
-    if (params.page) query.set("page", params.page.toString());
-    if (params.pageSize) query.set("pageSize", params.pageSize.toString());
-    if (params.search) query.set("search", params.search);
+    const take = Math.min(Math.max(params.pageSize ?? 20, 1), 100);
+    const page = Math.max(params.page ?? 1, 1);
+    query.set("skip", String((page - 1) * take));
+    query.set("take", String(take));
+    if (params.search && !params.subject) {
+      query.set(params.search.includes("@") ? "toAddress" : "subject", params.search);
+    }
+    if (params.subject) query.set("subject", params.subject);
+    if (params.channel) query.set("channel", params.channel);
+    if (params.toAddress) query.set("toAddress", params.toAddress);
     if (params.status) query.set("status", params.status);
+    if (params.startDate) query.set("startDate", params.startDate);
+    if (params.endDate) query.set("endDate", params.endDate);
 
     const queryString = query.toString() ? `?${query.toString()}` : "";
     return this.request(`/analytics/logs${queryString}`, { method: "GET" });
@@ -124,7 +142,7 @@ export class SenviokApiClient {
   async sendSms(payload: SendSmsPayload): Promise<{ id?: string; messageId?: string; status?: string }> {
     return this.request<{ id?: string; messageId?: string; status?: string }>("/sms", {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ to: payload.to, from: payload.senderId, text: payload.message }),
     });
   }
 
@@ -142,7 +160,7 @@ export class SenviokApiClient {
   }
 
   async getTemplate(templateId: string): Promise<any> {
-    return this.request(`/templates/${templateId}`, { method: "GET" });
+    return this.request(`/templates/${encodeURIComponent(templateId)}`, { method: "GET" });
   }
 
   async createTemplate(payload: CreateTemplatePayload): Promise<any> {
@@ -165,7 +183,7 @@ export class SenviokApiClient {
   }
 
   async addContact(payload: CreateContactPayload): Promise<any> {
-    return this.request(`/audiences/${payload.audienceId}/contacts`, {
+    return this.request(`/audiences/${encodeURIComponent(payload.audienceId)}/contacts`, {
       method: "POST",
       body: JSON.stringify({
         email: payload.email,
@@ -189,7 +207,7 @@ export class SenviokApiClient {
   }
 
   async deleteSuppression(id: string): Promise<any> {
-    return this.request(`/suppressions/${id}`, { method: "DELETE" });
+    return this.request(`/suppressions/${encodeURIComponent(id)}`, { method: "DELETE" });
   }
 
   // --- Domain Operations ---
@@ -205,11 +223,11 @@ export class SenviokApiClient {
   }
 
   async verifyDomain(domainId: string): Promise<any> {
-    return this.request(`/domains/${domainId}/verify`, { method: "POST" });
+    return this.request(`/domains/${encodeURIComponent(domainId)}/verify`, { method: "POST" });
   }
 
   async getDomainDkim(domainId: string): Promise<any> {
-    return this.request(`/domains/${domainId}/dkim`, { method: "GET" });
+    return this.request(`/domains/${encodeURIComponent(domainId)}/dkim`, { method: "GET" });
   }
 
   // --- Webhook Operations ---
@@ -225,7 +243,7 @@ export class SenviokApiClient {
   }
 
   async deleteWebhook(webhookId: string): Promise<any> {
-    return this.request(`/webhooks/${webhookId}`, { method: "DELETE" });
+    return this.request(`/webhooks/${encodeURIComponent(webhookId)}`, { method: "DELETE" });
   }
 
   // --- Account & Billing Operations ---

@@ -8,13 +8,13 @@ Built with TypeScript and the official `@modelcontextprotocol/sdk`.
 
 ## Key Features
 
-- **Zero Client Installs**: Runs as a remote HTTP/Server-Sent Events (SSE) service. Web AI platforms (e.g. OkeyMeta, ChatGPT Custom Actions) connect directly over HTTPS without end-users needing Node or CLI tools.
+- **Remote MCP**: Uses MCP Streamable HTTP, suitable for Vercel's request-based runtime. Older clients can use the legacy SSE route when connected to a persistent server.
 - **Instant Rollouts**: Add new tools to the server, and all connected AI agents immediately discover and use them on their next session without reinstalling or updating anything.
 - **Multi-Tenant Authentication**: Clients supply their Senviok API key via `Authorization: Bearer <key>`, `x-api-key: <key>`, `?api_key=<key>`, or as a per-tool `apiKey` argument.
 
 ---
 
-## Complete Tool Catalog (18 Tools)
+## Complete Tool Catalog (20 Tools)
 
 ### Email
 - `senviok_send_email`: Send transactional or marketing emails with HTML, text, and dynamic templates.
@@ -84,8 +84,8 @@ The server will start at `http://localhost:3001`.
 ## Connecting from AI Platforms
 
 ### OkeyMeta / Remote AI Platforms
-Connect to the live SSE endpoint:
-- **SSE URL:** `https://mcp.senviok.live/sse`
+Connect to the live MCP endpoint:
+- **Streamable HTTP URL:** `https://mcp.senviok.live/mcp`
 - **Headers:** `Authorization: Bearer <SENVIOK_API_KEY>`
 
 ### Claude Desktop / Cursor (Local or Remote)
@@ -94,7 +94,7 @@ Add to your `claude_desktop_config.json` or Cursor MCP settings:
 {
   "mcpServers": {
     "senviok": {
-      "url": "http://localhost:3001/sse",
+      "url": "http://localhost:3001/mcp",
       "headers": {
         "Authorization": "Bearer snk_live_xxxxxxxxxxxxxxxxxxxxxxxx"
       }

@@ -9,7 +9,7 @@ import { SenviokApiClient } from "../client/senviokApi.js";
 export function createSenviokMcpServer(sessionApiKey?: string) {
   const server = new McpServer({
     name: "senviok-remote-mcp",
-    version: "1.1.0",
+    version: "1.1.1",
   });
 
   const getClient = (overrideKey?: string) => {
@@ -31,7 +31,7 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
       fromName: z.string().optional().describe("Friendly sender display name"),
       replyTo: z.union([z.string(), z.array(z.string())]).optional().describe("Reply-To email address"),
       templateId: z.string().optional().describe("Optional Senviok template ID"),
-      templateData: z.record(z.string()).optional().describe("Key-value variables for template interpolation"),
+      templateData: z.record(z.string(), z.string()).optional().describe("Key-value variables for template interpolation"),
       addUnsubscribeFooter: z.boolean().optional().describe("Whether to append automated unsubscribe link"),
       apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
@@ -83,8 +83,13 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
     {
       search: z.string().optional().describe("Optional search term (email address or subject)"),
       status: z.enum(["Delivered", "Sent", "Bounced", "Failed", "Opened", "Clicked"]).optional().describe("Filter by email status"),
+      channel: z.enum(["Email", "SMS", "WhatsApp"]).optional().describe("Filter by message channel"),
+      toAddress: z.string().optional().describe("Filter by recipient address or phone number"),
+      subject: z.string().optional().describe("Filter by email subject"),
       page: z.number().int().positive().optional().describe("Page number (default: 1)"),
       pageSize: z.number().int().positive().optional().describe("Results per page (default: 20, max: 100)"),
+      startDate: z.string().optional().describe("Filter start date (ISO 8601)"),
+      endDate: z.string().optional().describe("Filter end date (ISO 8601)"),
       apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
@@ -95,6 +100,11 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
           status: args.status,
           page: args.page,
           pageSize: args.pageSize,
+          channel: args.channel,
+          toAddress: args.toAddress,
+          subject: args.subject,
+          startDate: args.startDate,
+          endDate: args.endDate,
         });
 
         return {
@@ -123,7 +133,7 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
     {
       to: z.string().describe("Recipient phone number in international E.164 format (e.g. +2348012345678)"),
       message: z.string().describe("SMS message content (160 characters per unit)"),
-      senderId: z.string().optional().describe("Approved sender identity/name"),
+      senderId: z.string().describe("Your approved sender identity/name (sent as the API's 'from' field)"),
       apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
@@ -167,7 +177,7 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
       to: z.string().describe("Recipient phone number in international format (e.g. +2348012345678)"),
       text: z.string().describe("Message text content"),
       templateId: z.string().optional().describe("Optional pre-approved WhatsApp template ID for proactive messages"),
-      data: z.record(z.any()).optional().describe("Template dynamic parameters (e.g. { 'customer_name': 'Ada' })"),
+      data: z.record(z.string(), z.unknown()).optional().describe("Template dynamic parameters (e.g. { 'customer_name': 'Ada' })"),
       deviceId: z.string().optional().describe("Optional WhatsApp device ID"),
       apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
@@ -662,7 +672,7 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
     "senviok_create_webhook",
     "Register a new webhook destination URL to receive real-time delivery and bounce events.",
     {
-      url: z.string().url().describe("HTTPS endpoint URL to receive webhook payloads"),
+      url: z.string().url().refine((value) => new URL(value).protocol === "https:", "Webhook URL must use HTTPS").describe("HTTPS endpoint URL to receive webhook payloads"),
       events: z.array(z.string()).describe("Events to subscribe to (e.g. ['email.delivered', 'email.bounced', 'email.complained'])"),
       apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },

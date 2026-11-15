@@ -15,7 +15,7 @@ Integrating Senviok gives your AI agents and application workflows the ability t
 
 Integration consists of two decoupled steps:
 1. **OAuth 2.0 Authentication**: Users link their Senviok account with one click.
-2. **MCP Tool Execution**: Your platform connects to Senviok's hosted Remote MCP server over Server-Sent Events (SSE).
+2. **MCP Tool Execution**: Your platform connects to Senviok's hosted Remote MCP server over Streamable HTTP.
 
 ---
 
@@ -115,10 +115,10 @@ Persist the `access_token` securely in your database associated with the authori
 
 ## 3. Remote MCP Server Integration
 
-Senviok hosts a managed remote Model Context Protocol (MCP) server over Server-Sent Events (SSE) at:
+Senviok hosts a managed remote Model Context Protocol (MCP) server over Streamable HTTP at:
 
 ```text
-https://mcp.senviok.live/sse
+https://mcp.senviok.live/mcp
 ```
 
 Because the MCP server dynamically provides tool definitions upon connection, your platform does not require local CLI tools or npm package installations. When Senviok adds new tools, your AI agents automatically discover and support them on their next session.
@@ -136,23 +136,12 @@ Connect and discover available tools:
 
 ```typescript
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
 export async function createSenviokClient(userAccessToken: string) {
-  const transport = new SSEClientTransport(
-    new URL("https://mcp.senviok.live/sse"),
-    {
-      eventSourceInit: {
-        headers: {
-          Authorization: `Bearer ${userAccessToken}`,
-        },
-      },
-      requestInit: {
-        headers: {
-          Authorization: `Bearer ${userAccessToken}`,
-        },
-      },
-    }
+  const transport = new StreamableHTTPClientTransport(
+    new URL("https://mcp.senviok.live/mcp"),
+    { requestInit: { headers: { Authorization: `Bearer ${userAccessToken}` } } }
   );
 
   const client = new Client(
@@ -182,12 +171,12 @@ Connect and call tools:
 
 ```python
 from mcp import ClientSession
-from mcp.client.sse import sse_client
+from mcp.client.streamable_http import streamablehttp_client
 
 async def run_senviok_agent(user_token: str):
     headers = {"Authorization": f"Bearer {user_token}"}
     
-    async with sse_client("https://mcp.senviok.live/sse", headers=headers) as (read, write):
+    async with streamablehttp_client("https://mcp.senviok.live/mcp", headers=headers) as (read, write, _):
         async with ClientSession(read, write) as session:
             await session.initialize()
             
@@ -210,7 +199,7 @@ async def run_senviok_agent(user_token: str):
 
 ## 4. Tool Catalog Reference
 
-The Senviok MCP server exposes 18 production tools organized across 8 functional modules:
+The Senviok MCP server exposes 20 production tools organized across 8 functional modules:
 
 | Module | Tool | Description |
 | :--- | :--- | :--- |

@@ -1,6 +1,7 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { config } from "./config.js";
 import { createSenviokMcpServer } from "./mcp/server.js";
 
@@ -9,14 +10,20 @@ const app = express();
 app.use(cors({ origin: "*" }));
 app.use(express.json());
 
+// Vercel invokes the exported Express app as a function. Local Docker/Node uses
+// app.listen below. Streamable HTTP is stateless so requests can land on any
+// Vercel function instance without relying on this process's memory.
+export default app;
+
 // Track active client SSE transports by sessionId
 const transports = new Map<string, SSEServerTransport>();
 
 // Helper to extract API key from headers or query parameters
 function extractApiKey(req: Request): string | undefined {
   const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    return authHeader.substring(7).trim();
+  if (authHeader) {
+    const bearer = authHeader.match(/^Bearer\s+(.+)$/i);
+    if (bearer?.[1]?.trim()) return bearer[1].trim();
   }
 
   const customHeader = req.headers["x-api-key"];
@@ -37,7 +44,7 @@ app.get("/health", (req: Request, res: Response) => {
   res.json({
     status: "ok",
     service: "senviok-remote-mcp",
-    version: "1.1.0",
+    version: "1.1.1",
     uptimeSeconds: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
   });
@@ -48,8 +55,9 @@ app.get("/", (req: Request, res: Response) => {
   res.json({
     name: "Senviok Remote MCP Server",
     description: "Cloud-hosted Model Context Protocol (MCP) server for Senviok email, SMS, WhatsApp, and delivery diagnostics.",
-    version: "1.1.0",
+    version: "1.1.1",
     endpoints: {
+      mcp: "/mcp",
       sse: "/sse",
       messages: "/messages",
       health: "/health",
@@ -89,6 +97,32 @@ app.get("/", (req: Request, res: Response) => {
 });
 
 /**
+ * MCP Streamable HTTP endpoint (stateless and safe for Vercel's per-request
+ * execution model). Construct a fresh server and transport for each request.
+ */
+app.all("/mcp", async (req: Request, res: Response) => {
+  const mcpServer = createSenviokMcpServer(extractApiKey(req));
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    void mcpServer.close().catch((err: unknown) => console.error("[MCP] Error closing request server:", err));
+  };
+
+  res.once("close", close);
+  try {
+    await mcpServer.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+  } catch (err: unknown) {
+    console.error("[MCP] Streamable HTTP request failed:", err);
+    if (!res.headersSent) res.status(500).json({ error: "MCP request failed" });
+    close();
+  }
+});
+
+/**
  * GET /sse
  * Main entry point for MCP clients connecting over Server-Sent Events (SSE).
  */
@@ -102,9 +136,10 @@ app.get("/sse", async (req: Request, res: Response) => {
 
     transports.set(transport.sessionId, transport);
 
-    req.on("close", () => {
+    res.once("close", () => {
       console.log(`[SSE] Client connection closed (sessionId: ${transport.sessionId})`);
       transports.delete(transport.sessionId);
+      void mcpServer.close().catch((err: unknown) => console.error("[SSE] Error closing MCP server:", err));
     });
 
     await mcpServer.connect(transport);
@@ -135,7 +170,9 @@ app.post("/messages", async (req: Request, res: Response) => {
   }
 
   try {
-    await transport.handlePostMessage(req, res);
+    // express.json() has consumed the request stream; pass the parsed value so
+    // the SDK does not try to read the body stream a second time.
+    await transport.handlePostMessage(req, res, req.body);
   } catch (err: any) {
     console.error(`[Messages] Error handling post message for session ${sessionId}:`, err);
     if (!res.headersSent) {
@@ -144,11 +181,13 @@ app.post("/messages", async (req: Request, res: Response) => {
   }
 });
 
-app.listen(config.port, () => {
-  console.log(`==================================================`);
-  console.log(`  🚀 Senviok Remote MCP Server v1.1.0 is running!`);
-  console.log(`  📡 Listening on:   http://localhost:${config.port}`);
-  console.log(`  🔗 SSE Endpoint:   http://localhost:${config.port}/sse`);
-  console.log(`  🔗 Base API:       ${config.senviokBaseUrl}`);
-  console.log(`==================================================`);
-});
+if (!process.env.VERCEL) {
+  app.listen(config.port, () => {
+    console.log("==================================================");
+    console.log(`  Senviok Remote MCP Server v1.1.1 is running on port ${config.port}`);
+    console.log(`  Streamable HTTP: http://localhost:${config.port}/mcp`);
+    console.log(`  Legacy SSE:      http://localhost:${config.port}/sse`);
+    console.log(`  Base API:        ${config.senviokBaseUrl}`);
+    console.log("==================================================");
+  });
+}
