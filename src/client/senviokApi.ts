@@ -52,9 +52,9 @@ export interface CreateWebhookPayload {
 
 export class SenviokApiClient {
   private baseUrl: string;
-  private apiKey: string;
+  private apiKey: string | (() => string);
 
-  constructor(apiKey?: string, baseUrl?: string) {
+  constructor(apiKey?: string | (() => string), baseUrl?: string) {
     this.apiKey = apiKey || config.defaultApiKey;
     this.baseUrl = baseUrl || config.senviokBaseUrl;
 
@@ -70,7 +70,7 @@ export class SenviokApiClient {
     const headers: Record<string, string> = {
       Accept: "application/json",
       ...(options.body ? { "Content-Type": "application/json" } : {}),
-      Authorization: `Bearer ${this.apiKey}`,
+      Authorization: `Bearer ${typeof this.apiKey === "function" ? this.apiKey() : this.apiKey}`,
       ...(options.headers as Record<string, string> || {}),
     };
 

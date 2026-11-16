@@ -6,7 +6,7 @@ import { SenviokApiClient } from "../client/senviokApi.js";
  * Creates and configures an MCP server instance with the full suite of Senviok tools.
  * Supports multi-tenancy: each session can carry its own active Senviok API key.
  */
-export function createSenviokMcpServer(sessionApiKey?: string) {
+export function createSenviokMcpServer(sessionApiKey?: string | (() => string)) {
   const server = new McpServer({
     name: "senviok-remote-mcp",
     version: "1.1.2",

@@ -17,7 +17,8 @@ export default app;
 
 // Track active client SSE transports by sessionId
 const transports = new Map<string, SSEServerTransport>();
-const sessionCredentials = new Map<string, string>();
+type SessionCredential = { token: string; principal: string };
+const sessionCredentials = new Map<string, SessionCredential>();
 const resourceUrl = process.env.MCP_RESOURCE_URL || "https://mcp.senviok.live/mcp";
 const resourceMetadataUrl = process.env.MCP_RESOURCE_METADATA_URL || "https://mcp.senviok.live/.well-known/oauth-protected-resource/mcp";
 const authorizationServer = process.env.SENVIOK_OAUTH_ISSUER || "https://api.senviok.live";
@@ -49,7 +50,8 @@ function extractApiKey(req: Request): string | undefined {
   return undefined;
 }
 
-async function validateBearerToken(token: string, res: Response): Promise<string | undefined> {
+async function validateBearerToken(token: string, res: Response): Promise<SessionCredential | undefined> {
+  let principal = "";
   try {
     const check = await fetch(`${config.senviokBaseUrl}/oauth/mcp-context`, {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
@@ -64,20 +66,23 @@ async function validateBearerToken(token: string, res: Response): Promise<string
       res.status(503).json({ error: "temporarily_unavailable", error_description: "Senviok could not validate this connection. Retry shortly." });
       return undefined;
     }
-    const context = await check.json() as { oauth?: boolean; audience?: string | null };
+    const context = await check.json() as { oauth?: boolean; audience?: string | null; client_id?: string | null; subject?: string | null; tenant_id?: string | null };
     if (context.oauth && context.audience !== resourceUrl) {
       res.setHeader("WWW-Authenticate", `Bearer error="invalid_token", resource_metadata="${resourceMetadataUrl}"`);
       res.status(401).json({ error: "invalid_token", error_description: "This token was issued for a different resource. Reconnect Senviok." });
       return undefined;
     }
+    principal = context.oauth
+      ? `oauth:${context.client_id ?? ""}:${context.subject ?? ""}:${context.tenant_id ?? ""}`
+      : `apikey:${context.subject ?? ""}:${context.tenant_id ?? ""}`;
   } catch {
     res.status(503).json({ error: "temporarily_unavailable", error_description: "Senviok could not validate this connection. Retry shortly." });
     return undefined;
   }
-  return token;
+  return { token, principal };
 }
 
-async function requireBearer(req: Request, res: Response): Promise<string | undefined> {
+async function requireBearer(req: Request, res: Response): Promise<SessionCredential | undefined> {
   const token = extractApiKey(req);
   if (!token) {
     res.setHeader("WWW-Authenticate", `Bearer resource_metadata="${resourceMetadataUrl}"`);
@@ -155,10 +160,11 @@ app.all("/mcp", async (req: Request, res: Response) => {
   const token = extractApiKey(req);
   const publicMethods = new Set(["initialize", "notifications/initialized", "tools/list"]);
   const canDiscoverBeforeAuth = req.method === "POST" && publicMethods.has(req.body?.method);
-  const apiKey = token
+  const credential = token
     ? await validateBearerToken(token, res)
     : canDiscoverBeforeAuth ? undefined : await requireBearer(req, res);
   if (res.headersSent) return;
+  const apiKey = credential?.token;
   const mcpServer = createSenviokMcpServer(apiKey);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
 
@@ -185,16 +191,16 @@ app.all("/mcp", async (req: Request, res: Response) => {
  * Main entry point for MCP clients connecting over Server-Sent Events (SSE).
  */
 app.get("/sse", async (req: Request, res: Response) => {
-  const apiKey = await requireBearer(req, res);
-  if (!apiKey) return;
+  const credential = await requireBearer(req, res);
+  if (!credential) return;
   console.log(`[SSE] New authenticated client connection from ${req.ip}`);
 
   try {
     const transport = new SSEServerTransport("/messages", res);
-    const mcpServer = createSenviokMcpServer(apiKey);
+    const mcpServer = createSenviokMcpServer(() => sessionCredentials.get(transport.sessionId)?.token ?? credential.token);
 
     transports.set(transport.sessionId, transport);
-    sessionCredentials.set(transport.sessionId, apiKey);
+    sessionCredentials.set(transport.sessionId, credential);
 
     res.once("close", () => {
       console.log(`[SSE] Client connection closed (sessionId: ${transport.sessionId})`);
@@ -230,12 +236,14 @@ app.post("/messages", async (req: Request, res: Response) => {
     return;
   }
 
-  const apiKey = await requireBearer(req, res);
-  if (!apiKey) return;
-  if (sessionCredentials.get(sessionId) !== apiKey) {
+  const credential = await requireBearer(req, res);
+  if (!credential) return;
+  const sessionCredential = sessionCredentials.get(sessionId);
+  if (sessionCredential?.principal !== credential.principal) {
     res.status(401).json({ error: "unauthorized", error_description: "This session belongs to a different OAuth connection." });
     return;
   }
+  sessionCredentials.set(sessionId, credential);
 
   try {
     // express.json() has consumed the request stream; pass the parsed value so
