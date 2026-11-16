@@ -60,7 +60,7 @@ export class SenviokApiClient {
 
     if (!this.apiKey) {
       throw new Error(
-        "Senviok API key missing. Please provide it via Authorization header (Bearer <key>), ?api_key=<key> query parameter, SENVIOK_API_KEY env var, or as an 'apiKey' tool argument."
+        "Senviok credentials are missing. Connect this MCP server with Senviok OAuth, or provide a legacy API key using the Authorization bearer header."
       );
     }
   }

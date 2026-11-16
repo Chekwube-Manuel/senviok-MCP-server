@@ -17,6 +17,16 @@ export default app;
 
 // Track active client SSE transports by sessionId
 const transports = new Map<string, SSEServerTransport>();
+const sessionCredentials = new Map<string, string>();
+const resourceUrl = process.env.MCP_RESOURCE_URL || "https://mcp.senviok.live/mcp";
+const resourceMetadataUrl = process.env.MCP_RESOURCE_METADATA_URL || "https://mcp.senviok.live/.well-known/oauth-protected-resource/mcp";
+const authorizationServer = process.env.SENVIOK_OAUTH_ISSUER || "https://api.senviok.live";
+const oauthScopes = ["email:send", "email:read", "inbox:read", "inbox:reply", "templates:read", "templates:write", "audiences:read", "audiences:write", "campaigns:read", "campaigns:write", "sms:send", "whatsapp:send", "suppressions:read", "suppressions:write", "domains:read", "domains:write", "webhooks:read", "webhooks:write", "account:read", "offline_access"];
+
+app.get("/.well-known/oauth-protected-resource/mcp", (_req, res) => {
+  res.setHeader("Cache-Control", "public, max-age=300");
+  res.json({ resource: resourceUrl, authorization_servers: [authorizationServer], bearer_methods_supported: ["header"], scopes_supported: oauthScopes, resource_documentation: "https://senviok.live/docs#oauth" });
+});
 
 // Helper to extract API key from headers or query parameters
 function extractApiKey(req: Request): string | undefined {
@@ -37,6 +47,44 @@ function extractApiKey(req: Request): string | undefined {
   }
 
   return undefined;
+}
+
+async function validateBearerToken(token: string, res: Response): Promise<string | undefined> {
+  try {
+    const check = await fetch(`${config.senviokBaseUrl}/oauth/mcp-context`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (check.status === 401 || check.status === 403) {
+      res.setHeader("WWW-Authenticate", `Bearer error="invalid_token", resource_metadata="${resourceMetadataUrl}"`);
+      res.status(401).json({ error: "invalid_token", error_description: "The Senviok access token is expired, revoked, or invalid." });
+      return undefined;
+    }
+    if (!check.ok) {
+      res.status(503).json({ error: "temporarily_unavailable", error_description: "Senviok could not validate this connection. Retry shortly." });
+      return undefined;
+    }
+    const context = await check.json() as { oauth?: boolean; audience?: string | null };
+    if (context.oauth && context.audience !== resourceUrl) {
+      res.setHeader("WWW-Authenticate", `Bearer error="invalid_token", resource_metadata="${resourceMetadataUrl}"`);
+      res.status(401).json({ error: "invalid_token", error_description: "This token was issued for a different resource. Reconnect Senviok." });
+      return undefined;
+    }
+  } catch {
+    res.status(503).json({ error: "temporarily_unavailable", error_description: "Senviok could not validate this connection. Retry shortly." });
+    return undefined;
+  }
+  return token;
+}
+
+async function requireBearer(req: Request, res: Response): Promise<string | undefined> {
+  const token = extractApiKey(req);
+  if (!token) {
+    res.setHeader("WWW-Authenticate", `Bearer resource_metadata="${resourceMetadataUrl}"`);
+    res.status(401).json({ error: "unauthorized", error_description: "Connect this MCP server with Senviok OAuth." });
+    return undefined;
+  }
+  return validateBearerToken(token, res);
 }
 
 // Health check endpoint
@@ -62,7 +110,7 @@ app.get("/", (req: Request, res: Response) => {
       messages: "/messages",
       health: "/health",
     },
-    documentation: "https://docs.senviok.live",
+    documentation: "https://senviok.live/docs#oauth",
     tools: [
       // Email
       "senviok_send_email",
@@ -104,7 +152,14 @@ app.get("/", (req: Request, res: Response) => {
  * execution model). Construct a fresh server and transport for each request.
  */
 app.all("/mcp", async (req: Request, res: Response) => {
-  const mcpServer = createSenviokMcpServer(extractApiKey(req));
+  const token = extractApiKey(req);
+  const publicMethods = new Set(["initialize", "notifications/initialized", "tools/list"]);
+  const canDiscoverBeforeAuth = req.method === "POST" && publicMethods.has(req.body?.method);
+  const apiKey = token
+    ? await validateBearerToken(token, res)
+    : canDiscoverBeforeAuth ? undefined : await requireBearer(req, res);
+  if (res.headersSent) return;
+  const mcpServer = createSenviokMcpServer(apiKey);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
 
   let closed = false;
@@ -130,18 +185,21 @@ app.all("/mcp", async (req: Request, res: Response) => {
  * Main entry point for MCP clients connecting over Server-Sent Events (SSE).
  */
 app.get("/sse", async (req: Request, res: Response) => {
-  const apiKey = extractApiKey(req);
-  console.log(`[SSE] New client connection from ${req.ip} ${apiKey ? "(authenticated)" : "(unauthenticated)"}`);
+  const apiKey = await requireBearer(req, res);
+  if (!apiKey) return;
+  console.log(`[SSE] New authenticated client connection from ${req.ip}`);
 
   try {
     const transport = new SSEServerTransport("/messages", res);
     const mcpServer = createSenviokMcpServer(apiKey);
 
     transports.set(transport.sessionId, transport);
+    sessionCredentials.set(transport.sessionId, apiKey);
 
     res.once("close", () => {
       console.log(`[SSE] Client connection closed (sessionId: ${transport.sessionId})`);
       transports.delete(transport.sessionId);
+      sessionCredentials.delete(transport.sessionId);
       void mcpServer.close().catch((err: unknown) => console.error("[SSE] Error closing MCP server:", err));
     });
 
@@ -169,6 +227,13 @@ app.post("/messages", async (req: Request, res: Response) => {
   const transport = transports.get(sessionId);
   if (!transport) {
     res.status(404).json({ error: `Session '${sessionId}' not found or has expired` });
+    return;
+  }
+
+  const apiKey = await requireBearer(req, res);
+  if (!apiKey) return;
+  if (sessionCredentials.get(sessionId) !== apiKey) {
+    res.status(401).json({ error: "unauthorized", error_description: "This session belongs to a different OAuth connection." });
     return;
   }
 

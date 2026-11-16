@@ -1,5 +1,9 @@
 # Senviok Remote MCP Server
 
+## Connect with OAuth
+
+Use the hosted Streamable HTTP MCP URL `https://mcp.senviok.live/mcp` and let ChatGPT, Claude, Codex, Cursor, or another OAuth-capable MCP client complete Senviok OAuth in the browser. Each member authorizes their own Senviok workspace; do not share a single workspace API key across users. OAuth metadata is available at `https://mcp.senviok.live/.well-known/oauth-protected-resource/mcp`, with authorization-server discovery at `https://api.senviok.live/.well-known/oauth-authorization-server`. See the [OAuth guide](https://senviok.live/docs#oauth) for client-specific setup.
+
 A cloud-hosted Model Context Protocol (MCP) server that exposes [Senviok's](https://senviok.live) communications infrastructure to AI agents and web platforms (such as Claude, ChatGPT, Cursor, and OkeyMeta).
 
 Built with TypeScript and the official `@modelcontextprotocol/sdk`.

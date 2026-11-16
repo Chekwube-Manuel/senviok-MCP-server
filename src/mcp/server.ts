@@ -12,6 +12,24 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
     version: "1.1.2",
   });
 
+  const toolScopes: Record<string, string> = {
+    senviok_send_email: "email:send", senviok_get_email_logs: "email:read",
+    senviok_list_inbox: "inbox:read", senviok_get_inbox_message: "inbox:read", senviok_reply_to_inbox_message: "inbox:reply",
+    senviok_send_sms: "sms:send", senviok_send_whatsapp: "whatsapp:send",
+    senviok_list_templates: "templates:read", senviok_get_template: "templates:read", senviok_create_template: "templates:write",
+    senviok_list_audiences: "audiences:read", senviok_create_audience: "audiences:write", senviok_add_contact: "audiences:write",
+    senviok_list_suppressions: "suppressions:read", senviok_add_suppression: "suppressions:write", senviok_remove_suppression: "suppressions:write",
+    senviok_list_domains: "domains:read", senviok_create_domain: "domains:write", senviok_verify_domain: "domains:write", senviok_get_domain_dns_records: "domains:read",
+    senviok_list_webhooks: "webhooks:read", senviok_create_webhook: "webhooks:write", senviok_get_account_balance: "account:read",
+  };
+  const typedServer = server as unknown as { tool: (...args: any[]) => unknown };
+  typedServer.tool = (name: string, description: string, inputSchema: Record<string, unknown>, callback: (...args: any[]) => unknown) =>
+    server.registerTool(name, {
+      description,
+      inputSchema: inputSchema as any,
+      _meta: { securitySchemes: [{ type: "oauth2", scopes: [toolScopes[name] ?? "email:read"] }] },
+    }, callback as any);
+
   const getClient = () => new SenviokApiClient(sessionApiKey);
 
   // ==========================================
