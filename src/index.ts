@@ -44,7 +44,7 @@ app.get("/health", (req: Request, res: Response) => {
   res.json({
     status: "ok",
     service: "senviok-remote-mcp",
-    version: "1.1.1",
+    version: "1.1.2",
     uptimeSeconds: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
   });
@@ -55,7 +55,7 @@ app.get("/", (req: Request, res: Response) => {
   res.json({
     name: "Senviok Remote MCP Server",
     description: "Cloud-hosted Model Context Protocol (MCP) server for Senviok email, SMS, WhatsApp, and delivery diagnostics.",
-    version: "1.1.1",
+    version: "1.1.2",
     endpoints: {
       mcp: "/mcp",
       sse: "/sse",
@@ -67,6 +67,9 @@ app.get("/", (req: Request, res: Response) => {
       // Email
       "senviok_send_email",
       "senviok_get_email_logs",
+      "senviok_list_inbox",
+      "senviok_get_inbox_message",
+      "senviok_reply_to_inbox_message",
       // SMS & WhatsApp
       "senviok_send_sms",
       "senviok_send_whatsapp",
@@ -184,7 +187,7 @@ app.post("/messages", async (req: Request, res: Response) => {
 if (!process.env.VERCEL) {
   app.listen(config.port, () => {
     console.log("==================================================");
-    console.log(`  Senviok Remote MCP Server v1.1.1 is running on port ${config.port}`);
+    console.log(`  Senviok Remote MCP Server v1.1.2 is running on port ${config.port}`);
     console.log(`  Streamable HTTP: http://localhost:${config.port}/mcp`);
     console.log(`  Legacy SSE:      http://localhost:${config.port}/sse`);
     console.log(`  Base API:        ${config.senviokBaseUrl}`);

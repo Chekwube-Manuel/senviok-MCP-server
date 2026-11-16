@@ -1,6 +1,6 @@
 {
   "name": "@senviok/remote-mcp-server",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Remote Model Context Protocol (MCP) server for Senviok",
   "type": "module",
   "main": "dist/index.js",

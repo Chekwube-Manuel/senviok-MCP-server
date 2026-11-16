@@ -138,6 +138,27 @@ export class SenviokApiClient {
     return this.request(`/analytics/logs${queryString}`, { method: "GET" });
   }
 
+  // --- Inbox operations ---
+  async listInbox(params: { limit?: number; offset?: number; search?: string } = {}): Promise<any> {
+    const query = new URLSearchParams();
+    if (params.limit !== undefined) query.set("limit", String(params.limit));
+    if (params.offset !== undefined) query.set("offset", String(params.offset));
+    if (params.search) query.set("search", params.search);
+    const suffix = query.size ? `?${query.toString()}` : "";
+    return this.request(`/inbox${suffix}`, { method: "GET" });
+  }
+
+  async getInboxMessage(id: string): Promise<any> {
+    return this.request(`/inbox/${encodeURIComponent(id)}`, { method: "GET" });
+  }
+
+  async replyToInboxMessage(id: string, payload: { subject?: string; htmlBody?: string; textBody?: string; attachmentIds?: string[] }): Promise<any> {
+    return this.request(`/inbox/${encodeURIComponent(id)}/reply`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
   // --- SMS Operations ---
   async sendSms(payload: SendSmsPayload): Promise<{ id?: string; messageId?: string; status?: string }> {
     return this.request<{ id?: string; messageId?: string; status?: string }>("/sms", {

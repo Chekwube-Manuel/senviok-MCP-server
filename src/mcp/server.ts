@@ -9,12 +9,10 @@ import { SenviokApiClient } from "../client/senviokApi.js";
 export function createSenviokMcpServer(sessionApiKey?: string) {
   const server = new McpServer({
     name: "senviok-remote-mcp",
-    version: "1.1.1",
+    version: "1.1.2",
   });
 
-  const getClient = (overrideKey?: string) => {
-    return new SenviokApiClient(overrideKey || sessionApiKey);
-  };
+  const getClient = () => new SenviokApiClient(sessionApiKey);
 
   // ==========================================
   // 1. EMAIL TOOLS
@@ -33,11 +31,10 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
       templateId: z.string().optional().describe("Optional Senviok template ID"),
       templateData: z.record(z.string(), z.string()).optional().describe("Key-value variables for template interpolation"),
       addUnsubscribeFooter: z.boolean().optional().describe("Whether to append automated unsubscribe link"),
-      apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
       try {
-        const client = getClient(args.apiKey);
+        const client = getClient();
         const result = await client.sendEmail({
           to: args.to,
           subject: args.subject,
@@ -90,11 +87,10 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
       pageSize: z.number().int().positive().optional().describe("Results per page (default: 20, max: 100)"),
       startDate: z.string().optional().describe("Filter start date (ISO 8601)"),
       endDate: z.string().optional().describe("Filter end date (ISO 8601)"),
-      apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
       try {
-        const client = getClient(args.apiKey);
+        const client = getClient();
         const result = await client.getEmailLogs({
           search: args.search,
           status: args.status,
@@ -124,6 +120,61 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
     }
   );
 
+  // Inbox tools let an agent inspect and respond to mail received by the
+  // authenticated Senviok workspace. Replies are sent as email, so call only
+  // after the user has asked to reply or approved the drafted response.
+  server.tool(
+    "senviok_list_inbox",
+    "List inbound email messages in the connected Senviok workspace. Supports search and pagination.",
+    {
+      limit: z.number().int().min(1).max(100).optional().describe("Maximum messages to return (default 50, max 100)"),
+      offset: z.number().int().min(0).optional().describe("Number of messages to skip"),
+      search: z.string().optional().describe("Search sender, recipient, subject, or message text"),
+    },
+    async (args) => {
+      try {
+        const result = await getClient().listInbox(args);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      } catch (err: any) {
+        return { isError: true, content: [{ type: "text", text: `Error listing inbox: ${err.message}` }] };
+      }
+    }
+  );
+
+  server.tool(
+    "senviok_get_inbox_message",
+    "Read one inbound email and its attachment metadata from the connected Senviok workspace.",
+    { messageId: z.string().describe("Senviok inbound message ID") },
+    async ({ messageId }) => {
+      try {
+        const result = await getClient().getInboxMessage(messageId);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      } catch (err: any) {
+        return { isError: true, content: [{ type: "text", text: `Error reading inbox message: ${err.message}` }] };
+      }
+    }
+  );
+
+  server.tool(
+    "senviok_reply_to_inbox_message",
+    "Send a reply to an inbound email in the connected Senviok workspace. Only use when the user explicitly requested or approved sending the reply.",
+    {
+      messageId: z.string().describe("Senviok inbound message ID to reply to"),
+      subject: z.string().optional().describe("Optional reply subject"),
+      textBody: z.string().optional().describe("Plain text reply body"),
+      htmlBody: z.string().optional().describe("HTML reply body"),
+      attachmentIds: z.array(z.string()).optional().describe("Previously uploaded Senviok attachment IDs to include"),
+    },
+    async ({ messageId, ...payload }) => {
+      try {
+        const result = await getClient().replyToInboxMessage(messageId, payload);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      } catch (err: any) {
+        return { isError: true, content: [{ type: "text", text: `Error replying to inbox message: ${err.message}` }] };
+      }
+    }
+  );
+
   // ==========================================
   // 2. SMS & WHATSAPP TOOLS
   // ==========================================
@@ -134,11 +185,10 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
       to: z.string().describe("Recipient phone number in international E.164 format (e.g. +2348012345678)"),
       message: z.string().describe("SMS message content (160 characters per unit)"),
       senderId: z.string().describe("Your approved sender identity/name (sent as the API's 'from' field)"),
-      apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
       try {
-        const client = getClient(args.apiKey);
+        const client = getClient();
         const result = await client.sendSms({
           to: args.to,
           message: args.message,
@@ -179,11 +229,10 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
       templateId: z.string().optional().describe("Optional pre-approved WhatsApp template ID for proactive messages"),
       data: z.record(z.string(), z.unknown()).optional().describe("Template dynamic parameters (e.g. { 'customer_name': 'Ada' })"),
       deviceId: z.string().optional().describe("Optional WhatsApp device ID"),
-      apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
       try {
-        const client = getClient(args.apiKey);
+        const client = getClient();
         const result = await client.sendWhatsApp({
           to: args.to,
           text: args.text,
@@ -224,11 +273,10 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
     "senviok_list_templates",
     "List all saved email templates in the user's Senviok library.",
     {
-      apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
       try {
-        const client = getClient(args.apiKey);
+        const client = getClient();
         const result = await client.listTemplates();
 
         return {
@@ -248,11 +296,10 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
     "Get full details and HTML content of a specific email template by ID.",
     {
       templateId: z.string().describe("The UUID of the template"),
-      apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
       try {
-        const client = getClient(args.apiKey);
+        const client = getClient();
         const result = await client.getTemplate(args.templateId);
 
         return {
@@ -274,11 +321,10 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
       name: z.string().describe("Friendly name of the template (e.g. 'Welcome Onboarding')"),
       subject: z.string().describe("Default email subject line"),
       htmlContent: z.string().describe("Responsive HTML email body"),
-      apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
       try {
-        const client = getClient(args.apiKey);
+        const client = getClient();
         const result = await client.createTemplate({
           name: args.name,
           subject: args.subject,
@@ -317,11 +363,10 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
     "senviok_list_audiences",
     "List all contact audience lists in Senviok.",
     {
-      apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
       try {
-        const client = getClient(args.apiKey);
+        const client = getClient();
         const result = await client.listAudiences();
 
         return {
@@ -341,11 +386,10 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
     "Create a new contact audience list for marketing campaigns and broadcasts.",
     {
       name: z.string().describe("Name of the new audience list (e.g. 'VIP Customers')"),
-      apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
       try {
-        const client = getClient(args.apiKey);
+        const client = getClient();
         const result = await client.createAudience(args.name);
 
         return {
@@ -381,11 +425,10 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
       email: z.string().describe("Contact email address"),
       firstName: z.string().optional().describe("Contact first name"),
       lastName: z.string().optional().describe("Contact last name"),
-      apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
       try {
-        const client = getClient(args.apiKey);
+        const client = getClient();
         const result = await client.addContact({
           audienceId: args.audienceId,
           email: args.email,
@@ -425,11 +468,10 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
     "senviok_list_suppressions",
     "List suppressed, bounced, or unsubscribed email addresses.",
     {
-      apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
       try {
-        const client = getClient(args.apiKey);
+        const client = getClient();
         const result = await client.listSuppressions();
 
         return {
@@ -450,11 +492,10 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
     {
       email: z.string().describe("Email address to suppress"),
       reason: z.string().optional().describe("Reason for suppression (e.g. 'Unsubscribe request')"),
-      apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
       try {
-        const client = getClient(args.apiKey);
+        const client = getClient();
         const result = await client.addSuppression(args.email, args.reason);
 
         return {
@@ -487,11 +528,10 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
     "Remove an email address from the suppression list, restoring its ability to receive emails.",
     {
       suppressionId: z.string().describe("UUID of the suppression record to remove"),
-      apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
       try {
-        const client = getClient(args.apiKey);
+        const client = getClient();
         await client.deleteSuppression(args.suppressionId);
 
         return {
@@ -525,11 +565,10 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
     "senviok_list_domains",
     "List all registered sending domains and their current DNS verification status (SPF, DKIM, DMARC, MX).",
     {
-      apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
       try {
-        const client = getClient(args.apiKey);
+        const client = getClient();
         const result = await client.listDomains();
 
         return {
@@ -549,11 +588,10 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
     "Register a new sending domain in Senviok and generate required DNS records (SPF, DKIM, MX).",
     {
       name: z.string().describe("Domain name (e.g. 'mail.yourdomain.com' or 'yourdomain.com')"),
-      apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
       try {
-        const client = getClient(args.apiKey);
+        const client = getClient();
         const result = await client.createDomain(args.name);
 
         return {
@@ -586,11 +624,10 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
     "Trigger DNS check for a registered domain to confirm SPF and DKIM DNS records have propagated.",
     {
       domainId: z.string().describe("The UUID of the domain to verify"),
-      apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
       try {
-        const client = getClient(args.apiKey);
+        const client = getClient();
         const result = await client.verifyDomain(args.domainId);
 
         return {
@@ -623,11 +660,10 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
     "Retrieve the exact DNS TXT and CNAME records needed to verify DKIM, SPF, and DMARC for a domain.",
     {
       domainId: z.string().describe("The UUID of the domain"),
-      apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
       try {
-        const client = getClient(args.apiKey);
+        const client = getClient();
         const result = await client.getDomainDkim(args.domainId);
 
         return {
@@ -649,11 +685,10 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
     "senviok_list_webhooks",
     "List all registered webhook endpoints and their subscribed events (e.g. email.delivered, email.bounced).",
     {
-      apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
       try {
-        const client = getClient(args.apiKey);
+        const client = getClient();
         const result = await client.listWebhooks();
 
         return {
@@ -674,11 +709,10 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
     {
       url: z.string().url().refine((value) => new URL(value).protocol === "https:", "Webhook URL must use HTTPS").describe("HTTPS endpoint URL to receive webhook payloads"),
       events: z.array(z.string()).describe("Events to subscribe to (e.g. ['email.delivered', 'email.bounced', 'email.complained'])"),
-      apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
       try {
-        const client = getClient(args.apiKey);
+        const client = getClient();
         const result = await client.createWebhook({
           url: args.url,
           events: args.events,
@@ -716,11 +750,10 @@ export function createSenviokMcpServer(sessionApiKey?: string) {
     "senviok_get_account_balance",
     "Get account billing info, current tier plan, remaining email/SMS credits, and usage stats.",
     {
-      apiKey: z.string().optional().describe("Optional Senviok API key override for this operation"),
     },
     async (args) => {
       try {
-        const client = getClient(args.apiKey);
+        const client = getClient();
         const [billing, stats] = await Promise.allSettled([
           client.getTenantBilling(),
           client.getAnalyticsStats(),
